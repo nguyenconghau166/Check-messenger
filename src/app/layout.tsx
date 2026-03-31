@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Messenger Sync - Dong bo tin nhan Fanpage",
-  description:
-    "Dong bo tin nhan tu Facebook Fanpage vao Supabase de phan tich chat luong CSKH",
+  title: "Chat Quality Agent",
+  description: "AI-powered customer service quality assessment",
 };
 
 export default function RootLayout({
@@ -14,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body className="bg-gray-50 text-gray-900 min-h-screen">{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

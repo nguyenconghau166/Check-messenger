@@ -1,29 +1,27 @@
-export default function DashboardLayout({
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { Sidebar } from "@/components/sidebar";
+import { Header } from "@/components/header";
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
   return (
-    <div className="min-h-screen">
-      <nav className="bg-white border-b px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <a href="/" className="font-bold text-lg">
-            Messenger Sync
-          </a>
-          <div className="flex gap-4">
-            <a href="/" className="text-gray-600 hover:text-gray-900 text-sm">
-              Trang chu
-            </a>
-            <a
-              href="/dashboard"
-              className="text-blue-600 font-medium text-sm"
-            >
-              Dashboard
-            </a>
-          </div>
-        </div>
-      </nav>
-      <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header user={user} />
+        <main className="flex-1 overflow-y-auto p-6 bg-[hsl(var(--secondary))]">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
