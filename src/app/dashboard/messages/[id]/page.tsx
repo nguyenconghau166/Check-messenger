@@ -43,7 +43,20 @@ export default function ConversationDetailPage() {
                 <div className="text-xs opacity-70 mb-1">
                   {msg.sender_name || msg.sender_type} · {new Date(msg.sent_at).toLocaleTimeString("vi-VN")}
                 </div>
-                <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                <div className="text-sm whitespace-pre-wrap">
+                  {msg.content.split(/(\[Hình ảnh\]|\[Video\]|\[Âm thanh\]|\[File: [^\]]+\]|\[Sticker\]|\[GIF\]|\[Đính kèm\]|\[Vị trí\]|\[Liên kết\])/).map((part, idx) =>
+                    /^\[(Hình ảnh|Video|Âm thanh|File:|Sticker|GIF|Đính kèm|Vị trí|Liên kết)/.test(part) ? (
+                      <span key={idx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${
+                        msg.sender_type === "agent" ? "bg-white/20" : "bg-gray-200"
+                      }`}>
+                        {part.includes("Hình ảnh") ? "🖼️" : part.includes("Video") ? "🎥" : part.includes("Sticker") ? "😀" : part.includes("File") ? "📎" : "📄"}
+                        {part.slice(1, -1)}
+                      </span>
+                    ) : (
+                      <span key={idx}>{part}</span>
+                    )
+                  )}
+                </div>
               </div>
             </div>
           ))}

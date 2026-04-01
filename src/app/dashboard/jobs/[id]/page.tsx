@@ -64,7 +64,7 @@ export default function JobDetailPage() {
   const latestRun = job?.runs?.[0];
   const isRunning = running || latestRun?.status === "running";
   const progress = latestRun?.status === "running" && latestRun.summary
-    ? latestRun.summary as { total?: number; analyzed?: number; passed?: number; failed?: number }
+    ? latestRun.summary as { total?: number; analyzed?: number; passed?: number; failed?: number; skipped?: number }
     : null;
 
   if (loading) return <div className="text-center py-12">Đang tải...</div>;
@@ -122,6 +122,7 @@ export default function JobDetailPage() {
           <div className="flex gap-4 mt-2 text-xs text-[hsl(var(--muted-foreground))]">
             <span className="text-green-600">Pass: {progress.passed || 0}</span>
             <span className="text-red-600">Fail: {(progress.analyzed || 0) - (progress.passed || 0)}</span>
+            {progress.skipped ? <span className="text-gray-500">Bỏ qua: {progress.skipped}</span> : null}
           </div>
         </div>
       )}

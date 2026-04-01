@@ -11,12 +11,31 @@ export interface AnalysisResult {
   summary: string;
 }
 
+export interface BatchAnalysisResult {
+  conversation_index: number;
+  score: number;
+  status: "pass" | "fail";
+  violations: {
+    rule_name: string;
+    severity: string;
+    evidence: string;
+    detail: string;
+  }[];
+  summary: string;
+}
+
 export interface AIProvider {
   analyze(
     transcript: string,
     rules: string,
     model: string
   ): Promise<{ result: AnalysisResult; inputTokens: number; outputTokens: number }>;
+
+  analyzeBatch(
+    prompt: string,
+    model: string,
+    expectedCount: number
+  ): Promise<{ results: BatchAnalysisResult[]; inputTokens: number; outputTokens: number }>;
 }
 
 export function calculateCostUSD(

@@ -14,6 +14,12 @@ export default function NewJobPage() {
     ai_provider: "claude",
     ai_model: "claude-haiku-4-5-20251001",
     input_channel_ids: [] as string[],
+    batch_size: 5,
+    skip_conditions: {
+      min_messages: 3,
+      min_customer_messages: 1,
+      exclude_keywords: "",
+    },
     rules_content: `## Quy tắc đánh giá CSKH
 
 ### 1. Thời gian phản hồi
@@ -55,7 +61,17 @@ export default function NewJobPage() {
     const res = await fetch("/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        skip_conditions: {
+          min_messages: form.skip_conditions.min_messages,
+          min_customer_messages: form.skip_conditions.min_customer_messages,
+          exclude_keywords: form.skip_conditions.exclude_keywords
+            ? form.skip_conditions.exclude_keywords.split(",").map((k: string) => k.trim()).filter(Boolean)
+            : [],
+        },
+        rules_config: { batch_size: form.batch_size },
+      }),
     });
     if (res.ok) {
       router.push("/dashboard/jobs");
@@ -145,6 +161,62 @@ export default function NewJobPage() {
               ))
             )}
           </div>
+        </div>
+
+        {/* Skip conditions */}
+        <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+          <h4 className="text-sm font-semibold">Điều kiện loại trừ</h4>
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">Bỏ qua các hội thoại không cần phân tích để tiết kiệm token.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium mb-1">Tối thiểu số tin nhắn</label>
+              <input
+                type="number"
+                min={0}
+                value={form.skip_conditions.min_messages}
+                onChange={(e) => setForm({ ...form, skip_conditions: { ...form.skip_conditions, min_messages: parseInt(e.target.value) || 0 } })}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">Bỏ qua hội thoại có ít hơn N tin nhắn</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Tối thiểu tin nhắn khách</label>
+              <input
+                type="number"
+                min={0}
+                value={form.skip_conditions.min_customer_messages}
+                onChange={(e) => setForm({ ...form, skip_conditions: { ...form.skip_conditions, min_customer_messages: parseInt(e.target.value) || 0 } })}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">Bỏ qua nếu khách không phản hồi đủ</p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Từ khóa loại trừ (phân cách bằng dấu phẩy)</label>
+            <input
+              value={form.skip_conditions.exclude_keywords}
+              onChange={(e) => setForm({ ...form, skip_conditions: { ...form.skip_conditions, exclude_keywords: e.target.value } })}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+              placeholder="test, spam, hello, xin chào"
+            />
+            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">Bỏ qua hội thoại chỉ chứa các từ khóa này</p>
+          </div>
+        </div>
+
+        {/* Batch size */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Batch size (số hội thoại/lần gọi AI)</label>
+          <select
+            value={form.batch_size}
+            onChange={(e) => setForm({ ...form, batch_size: parseInt(e.target.value) })}
+            className="w-full px-3 py-2 border rounded-lg"
+          >
+            <option value={1}>1 (từng hội thoại riêng lẻ)</option>
+            <option value={3}>3 hội thoại/batch</option>
+            <option value={5}>5 hội thoại/batch (khuyến nghị)</option>
+            <option value={10}>10 hội thoại/batch</option>
+          </select>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">Gộp nhiều hội thoại vào 1 lần gọi AI để tiết kiệm token. Batch lớn hơn = tiết kiệm hơn nhưng cần model mạnh.</p>
         </div>
 
         <div>

@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       input_channel_ids: body.input_channel_ids || [],
       rules_content: body.rules_content || null,
       rules_config: body.rules_config || {},
+      skip_conditions: body.skip_conditions || {},
       ai_provider: body.ai_provider || "claude",
       ai_model: body.ai_model || "claude-haiku-4-5-20251001",
     })

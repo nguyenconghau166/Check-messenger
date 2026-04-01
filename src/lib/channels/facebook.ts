@@ -7,6 +7,16 @@ interface FacebookCredentials {
 
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
+function attachmentPlaceholder(att: Record<string, unknown>): string {
+  const mimeType = (att.mime_type as string) || "";
+  const name = (att.name as string) || "";
+  if (mimeType.startsWith("image") || att.image_data) return "[Hình ảnh]";
+  if (mimeType.startsWith("video") || att.video_data) return "[Video]";
+  if (mimeType.startsWith("audio")) return "[Âm thanh]";
+  if (name) return `[File: ${name}]`;
+  return "[Đính kèm]";
+}
+
 export class FacebookAdapter implements ChannelAdapter {
   private creds: FacebookCredentials;
 
@@ -15,7 +25,7 @@ export class FacebookAdapter implements ChannelAdapter {
   }
 
   async healthCheck(): Promise<boolean> {
-    const res = await fetch(
+    const res: Response = await fetch(
       `${GRAPH_API}/me?access_token=${this.creds.page_access_token}`
     );
     return res.ok;
@@ -25,7 +35,6 @@ export class FacebookAdapter implements ChannelAdapter {
     const sinceTs = since ? Math.floor(since.getTime() / 1000) : 0;
     const conversations: ChannelConversation[] = [];
 
-    // Paginate through conversations
     let nextURL: string | null = `${GRAPH_API}/${this.creds.page_id}/conversations?fields=id,participants,updated_time&access_token=${this.creds.page_access_token}&limit=100`;
 
     while (nextURL) {
@@ -40,7 +49,6 @@ export class FacebookAdapter implements ChannelAdapter {
       for (const conv of data.data || []) {
         const updatedTime = new Date(conv.updated_time);
         if (sinceTs && updatedTime.getTime() / 1000 < sinceTs) {
-          // Facebook returns sorted by updated_time desc, so we can stop
           nextURL = null;
           break;
         }
@@ -49,7 +57,6 @@ export class FacebookAdapter implements ChannelAdapter {
           (p: { id: string }) => p.id !== this.creds.page_id
         );
 
-        // Fetch messages for this conversation separately (with pagination)
         const messages = await this.fetchConversationMessages(conv.id, sinceTs);
 
         conversations.push({
@@ -61,7 +68,6 @@ export class FacebookAdapter implements ChannelAdapter {
         });
       }
 
-      // Follow cursor pagination
       if (nextURL !== null) {
         nextURL = data.paging?.next || null;
       }
@@ -72,7 +78,7 @@ export class FacebookAdapter implements ChannelAdapter {
 
   private async fetchConversationMessages(conversationId: string, sinceTs: number): Promise<ChannelMessage[]> {
     const messages: ChannelMessage[] = [];
-    let nextURL: string | null = `${GRAPH_API}/${conversationId}/messages?fields=id,message,from,created_time,attachments&access_token=${this.creds.page_access_token}&limit=100`;
+    let nextURL: string | null = `${GRAPH_API}/${conversationId}/messages?fields=id,message,from,created_time,attachments,sticker&access_token=${this.creds.page_access_token}&limit=100`;
 
     while (nextURL) {
       const res: Response = await fetch(nextURL);
@@ -83,7 +89,30 @@ export class FacebookAdapter implements ChannelAdapter {
       for (const msg of data.data || []) {
         const createdTime = new Date(msg.created_time);
         if (sinceTs && createdTime.getTime() / 1000 < sinceTs) {
-          return messages; // Messages are sorted desc, stop here
+          return messages;
+        }
+
+        let content: string = msg.message || "";
+        let contentType = "text";
+        const attachmentsMeta: { type: string }[] = [];
+
+        // Process attachments — store only lightweight metadata + placeholder in content
+        if (msg.attachments?.data?.length) {
+          const placeholders: string[] = [];
+          for (const att of msg.attachments.data) {
+            const placeholder = attachmentPlaceholder(att);
+            placeholders.push(placeholder);
+            attachmentsMeta.push({ type: att.mime_type || "file" });
+          }
+          const placeholderText = placeholders.join(" ");
+          content = content ? `${content}\n${placeholderText}` : placeholderText;
+          contentType = "file";
+        }
+
+        // Sticker
+        if (msg.sticker) {
+          content = content ? `${content}\n[Sticker]` : "[Sticker]";
+          contentType = "sticker";
         }
 
         messages.push({
@@ -91,15 +120,14 @@ export class FacebookAdapter implements ChannelAdapter {
           sender_type: msg.from?.id === this.creds.page_id ? "agent" : "customer",
           sender_name: msg.from?.name || "",
           sender_external_id: msg.from?.id || "",
-          content: msg.message || "",
-          content_type: msg.attachments?.data?.length ? "file" : "text",
-          attachments: msg.attachments?.data || [],
+          content,
+          content_type: contentType,
+          attachments: attachmentsMeta,
           sent_at: createdTime,
-          raw_data: msg,
+          raw_data: {},
         });
       }
 
-      // Follow cursor pagination
       nextURL = data.paging?.next || null;
     }
 

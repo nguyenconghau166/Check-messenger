@@ -10,6 +10,20 @@ interface ZaloCredentials {
 
 const ZALO_API = "https://openapi.zalo.me/v3.0";
 
+function zaloAttachmentPlaceholder(msgType: string): string {
+  switch (msgType) {
+    case "image": return "[Hình ảnh]";
+    case "gif": return "[GIF]";
+    case "video": return "[Video]";
+    case "audio": return "[Âm thanh]";
+    case "file": return "[File]";
+    case "sticker": return "[Sticker]";
+    case "location": return "[Vị trí]";
+    case "link": return "[Liên kết]";
+    default: return "[Đính kèm]";
+  }
+}
+
 export class ZaloAdapter implements ChannelAdapter {
   private creds: ZaloCredentials;
 
@@ -27,7 +41,6 @@ export class ZaloAdapter implements ChannelAdapter {
   async fetchRecentConversations(since?: Date): Promise<ChannelConversation[]> {
     const conversations: ChannelConversation[] = [];
 
-    // Fetch recent conversations list
     const listRes = await fetch(
       `${ZALO_API}/oa/conversation/list?offset=0&count=50`,
       { headers: { access_token: this.creds.access_token } }
@@ -39,7 +52,6 @@ export class ZaloAdapter implements ChannelAdapter {
     for (const conv of listData.data || []) {
       if (since && new Date(conv.updated_at * 1000) < since) continue;
 
-      // Fetch messages for this conversation
       const msgRes = await fetch(
         `${ZALO_API}/oa/conversation/detail?user_id=${conv.user_id}&offset=0&count=50`,
         { headers: { access_token: this.creds.access_token } }
@@ -47,17 +59,31 @@ export class ZaloAdapter implements ChannelAdapter {
 
       const msgData = await msgRes.json();
       const messages: ChannelMessage[] = (msgData.data || []).map(
-        (msg: { msg_id: string; type: string; from_id: string; from_display_name?: string; message?: string; created_time: number; attachments?: unknown[] }) => ({
-          external_message_id: msg.msg_id,
-          sender_type: msg.from_id === this.creds.oa_id ? "agent" : "customer",
-          sender_name: msg.from_display_name || "",
-          sender_external_id: msg.from_id || "",
-          content: msg.message || "",
-          content_type: msg.type === "text" ? "text" : "file",
-          attachments: msg.attachments || [],
-          sent_at: new Date(msg.created_time),
-          raw_data: msg,
-        })
+        (msg: { msg_id: string; type: string; from_id: string; from_display_name?: string; message?: string; created_time: number; attachments?: unknown[] }) => {
+          let content = msg.message || "";
+          let contentType = "text";
+          const attachmentsMeta: { type: string }[] = [];
+
+          // For non-text messages, add placeholder instead of storing attachment data
+          if (msg.type !== "text") {
+            const placeholder = zaloAttachmentPlaceholder(msg.type);
+            content = content ? `${content}\n${placeholder}` : placeholder;
+            contentType = "file";
+            attachmentsMeta.push({ type: msg.type });
+          }
+
+          return {
+            external_message_id: msg.msg_id,
+            sender_type: msg.from_id === this.creds.oa_id ? "agent" as const : "customer" as const,
+            sender_name: msg.from_display_name || "",
+            sender_external_id: msg.from_id || "",
+            content,
+            content_type: contentType,
+            attachments: attachmentsMeta,
+            sent_at: new Date(msg.created_time),
+            raw_data: {},
+          };
+        }
       );
 
       conversations.push({
@@ -65,7 +91,7 @@ export class ZaloAdapter implements ChannelAdapter {
         external_user_id: conv.user_id,
         customer_name: conv.display_name || "Unknown",
         messages,
-        metadata: conv,
+        metadata: {},
       });
     }
 
