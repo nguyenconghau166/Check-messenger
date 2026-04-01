@@ -26,5 +26,26 @@ export async function GET(request: Request) {
   const { data, error, count } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data, total: count, page, limit });
+
+  // Fetch last message content for each conversation
+  const conversationsWithLastMsg = await Promise.all(
+    (data || []).map(async (conv) => {
+      const { data: lastMsg } = await supabase
+        .from("messages")
+        .select("content, sender_type, sender_name")
+        .eq("conversation_id", conv.id)
+        .order("sent_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      return {
+        ...conv,
+        last_message_content: lastMsg?.content || null,
+        last_message_sender_type: lastMsg?.sender_type || null,
+        last_message_sender_name: lastMsg?.sender_name || null,
+      };
+    })
+  );
+
+  return NextResponse.json({ data: conversationsWithLastMsg, total: count, page, limit });
 }

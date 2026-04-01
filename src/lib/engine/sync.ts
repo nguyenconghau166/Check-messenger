@@ -4,7 +4,11 @@ import { FacebookAdapter } from "@/lib/channels/facebook";
 import { ZaloAdapter } from "@/lib/channels/zalo";
 import type { ChannelAdapter } from "@/lib/channels/types";
 
-export async function syncChannel(channelId: string, userId: string) {
+export interface SyncOptions {
+  sinceOverride?: Date; // Override the default since timestamp
+}
+
+export async function syncChannel(channelId: string, userId: string, opts?: SyncOptions) {
   const supabase = createAdminClient();
 
   // Get channel
@@ -30,8 +34,14 @@ export async function syncChannel(channelId: string, userId: string) {
     throw new Error(`Unknown channel type: ${channel.channel_type}`);
   }
 
-  // Fetch conversations since last sync
-  const since = channel.last_sync_at ? new Date(channel.last_sync_at) : undefined;
+  // Determine since date: use override, or channel's last_sync_at, or undefined for all
+  let since: Date | undefined;
+  if (opts?.sinceOverride !== undefined) {
+    since = opts.sinceOverride;
+  } else if (channel.last_sync_at) {
+    since = new Date(channel.last_sync_at);
+  }
+
   const conversations = await adapter.fetchRecentConversations(since);
 
   let totalMessages = 0;

@@ -23,27 +23,70 @@ export class FacebookAdapter implements ChannelAdapter {
 
   async fetchRecentConversations(since?: Date): Promise<ChannelConversation[]> {
     const sinceTs = since ? Math.floor(since.getTime() / 1000) : 0;
-    const url = `${GRAPH_API}/${this.creds.page_id}/conversations?fields=id,participants,updated_time,messages{message,from,created_time,attachments}&access_token=${this.creds.page_access_token}&limit=50`;
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Facebook API error: ${err}`);
-    }
-
-    const data = await res.json();
     const conversations: ChannelConversation[] = [];
 
-    for (const conv of data.data || []) {
-      const updatedTime = new Date(conv.updated_time);
-      if (sinceTs && updatedTime.getTime() / 1000 < sinceTs) continue;
+    // Paginate through conversations
+    let nextURL: string | null = `${GRAPH_API}/${this.creds.page_id}/conversations?fields=id,participants,updated_time&access_token=${this.creds.page_access_token}&limit=100`;
 
-      const customer = conv.participants?.data?.find(
-        (p: { id: string }) => p.id !== this.creds.page_id
-      );
+    while (nextURL) {
+      const res: Response = await fetch(nextURL);
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Facebook API error: ${err}`);
+      }
 
-      const messages: ChannelMessage[] = (conv.messages?.data || []).map(
-        (msg: { id: string; from: { id: string; name: string }; message?: string; created_time: string; attachments?: { data: unknown[] } }) => ({
+      const data = await res.json();
+
+      for (const conv of data.data || []) {
+        const updatedTime = new Date(conv.updated_time);
+        if (sinceTs && updatedTime.getTime() / 1000 < sinceTs) {
+          // Facebook returns sorted by updated_time desc, so we can stop
+          nextURL = null;
+          break;
+        }
+
+        const customer = conv.participants?.data?.find(
+          (p: { id: string }) => p.id !== this.creds.page_id
+        );
+
+        // Fetch messages for this conversation separately (with pagination)
+        const messages = await this.fetchConversationMessages(conv.id, sinceTs);
+
+        conversations.push({
+          external_conversation_id: conv.id,
+          external_user_id: customer?.id || "",
+          customer_name: customer?.name || "Unknown",
+          messages,
+          metadata: { updated_time: conv.updated_time },
+        });
+      }
+
+      // Follow cursor pagination
+      if (nextURL !== null) {
+        nextURL = data.paging?.next || null;
+      }
+    }
+
+    return conversations;
+  }
+
+  private async fetchConversationMessages(conversationId: string, sinceTs: number): Promise<ChannelMessage[]> {
+    const messages: ChannelMessage[] = [];
+    let nextURL: string | null = `${GRAPH_API}/${conversationId}/messages?fields=id,message,from,created_time,attachments&access_token=${this.creds.page_access_token}&limit=100`;
+
+    while (nextURL) {
+      const res: Response = await fetch(nextURL);
+      if (!res.ok) break;
+
+      const data = await res.json();
+
+      for (const msg of data.data || []) {
+        const createdTime = new Date(msg.created_time);
+        if (sinceTs && createdTime.getTime() / 1000 < sinceTs) {
+          return messages; // Messages are sorted desc, stop here
+        }
+
+        messages.push({
           external_message_id: msg.id,
           sender_type: msg.from?.id === this.creds.page_id ? "agent" : "customer",
           sender_name: msg.from?.name || "",
@@ -51,20 +94,15 @@ export class FacebookAdapter implements ChannelAdapter {
           content: msg.message || "",
           content_type: msg.attachments?.data?.length ? "file" : "text",
           attachments: msg.attachments?.data || [],
-          sent_at: new Date(msg.created_time),
+          sent_at: createdTime,
           raw_data: msg,
-        })
-      );
+        });
+      }
 
-      conversations.push({
-        external_conversation_id: conv.id,
-        external_user_id: customer?.id || "",
-        customer_name: customer?.name || "Unknown",
-        messages,
-        metadata: { updated_time: conv.updated_time },
-      });
+      // Follow cursor pagination
+      nextURL = data.paging?.next || null;
     }
 
-    return conversations;
+    return messages;
   }
 }

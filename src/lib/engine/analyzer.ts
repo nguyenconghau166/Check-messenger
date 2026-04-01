@@ -5,7 +5,7 @@ import { GeminiProvider } from "@/lib/ai/gemini";
 import { buildAnalysisPrompt, formatTranscript } from "@/lib/ai/prompts";
 import { calculateCostUSD, type AIProvider } from "@/lib/ai/provider";
 
-export async function runJob(jobId: string, userId: string) {
+export async function runJob(jobId: string, userId: string, existingRunId?: string) {
   const supabase = createAdminClient();
 
   // Get job
@@ -18,14 +18,17 @@ export async function runJob(jobId: string, userId: string) {
 
   if (!job) throw new Error("Job not found");
 
-  // Create job run
-  const { data: run } = await supabase
-    .from("job_runs")
-    .insert({ job_id: jobId, user_id: userId, status: "running" })
-    .select("id")
-    .single();
-
-  if (!run) throw new Error("Failed to create job run");
+  // Use existing run or create a new one
+  let runId = existingRunId;
+  if (!runId) {
+    const { data: run } = await supabase
+      .from("job_runs")
+      .insert({ job_id: jobId, user_id: userId, status: "running" })
+      .select("id")
+      .single();
+    if (!run) throw new Error("Failed to create job run");
+    runId = run.id;
+  }
 
   try {
     // Get AI API key from settings
@@ -70,6 +73,16 @@ export async function runJob(jobId: string, userId: string) {
     let totalPassed = 0;
     let totalFailed = 0;
     let totalCost = 0;
+    let analyzed = 0;
+    const totalConversations = (conversations || []).length;
+
+    // Update initial progress
+    await supabase
+      .from("job_runs")
+      .update({
+        summary: { total: totalConversations, analyzed: 0, passed: 0, failed: 0, cost_usd: 0 },
+      })
+      .eq("id", runId);
 
     for (const conv of conversations || []) {
       // Get messages
@@ -79,10 +92,13 @@ export async function runJob(jobId: string, userId: string) {
         .eq("conversation_id", conv.id)
         .order("sent_at", { ascending: true });
 
-      if (!messages || messages.length === 0) continue;
+      if (!messages || messages.length === 0) {
+        analyzed++;
+        continue;
+      }
 
       const transcript = formatTranscript(messages);
-      const prompt = buildAnalysisPrompt(transcript, job.rules_content || "Đánh giá chất lượng CSKH tổng thể");
+      const prompt = buildAnalysisPrompt(transcript, job.rules_content || "Evaluate overall customer service quality");
 
       const { result, inputTokens, outputTokens } = await provider.analyze(
         prompt,
@@ -96,7 +112,7 @@ export async function runJob(jobId: string, userId: string) {
 
       // Save result
       await supabase.from("job_results").insert({
-        job_run_id: run.id,
+        job_run_id: runId,
         user_id: userId,
         conversation_id: conv.id,
         result_type: "qc_violation",
@@ -120,29 +136,46 @@ export async function runJob(jobId: string, userId: string) {
       await supabase.from("ai_usage_logs").insert({
         user_id: userId,
         job_id: jobId,
-        job_run_id: run.id,
+        job_run_id: runId,
         provider: job.ai_provider,
         model: job.ai_model,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         cost_usd: cost,
       });
+
+      analyzed++;
+
+      // Update progress after each conversation
+      await supabase
+        .from("job_runs")
+        .update({
+          summary: {
+            total: totalConversations,
+            analyzed,
+            passed: totalPassed,
+            failed: totalFailed,
+            cost_usd: totalCost,
+          },
+        })
+        .eq("id", runId);
     }
 
-    // Update job run
+    // Update job run - completed
     await supabase
       .from("job_runs")
       .update({
         status: "success",
         finished_at: new Date().toISOString(),
         summary: {
-          total: (conversations || []).length,
+          total: totalConversations,
+          analyzed,
           passed: totalPassed,
           failed: totalFailed,
           cost_usd: totalCost,
         },
       })
-      .eq("id", run.id);
+      .eq("id", runId);
 
     // Update job
     await supabase
@@ -150,13 +183,13 @@ export async function runJob(jobId: string, userId: string) {
       .update({ last_run_at: new Date().toISOString(), last_run_status: "success" })
       .eq("id", jobId);
 
-    return { runId: run.id, total: (conversations || []).length, passed: totalPassed, failed: totalFailed };
+    return { runId, total: totalConversations, passed: totalPassed, failed: totalFailed };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown error";
     await supabase
       .from("job_runs")
       .update({ status: "error", finished_at: new Date().toISOString(), error_message: errorMsg })
-      .eq("id", run.id);
+      .eq("id", runId);
 
     await supabase
       .from("jobs")

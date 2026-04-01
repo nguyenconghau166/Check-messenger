@@ -58,15 +58,23 @@ export default function JobsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {job.last_run_status && (
+                  {job.last_run_status ? (
                     <span className={`px-2 py-0.5 rounded text-xs ${
-                      job.last_run_status === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      job.last_run_status === "success" ? "bg-green-100 text-green-700"
+                      : job.last_run_status === "running" ? "bg-blue-100 text-blue-700"
+                      : job.last_run_status === "error" ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-700"
                     }`}>
-                      {job.last_run_status}
+                      {job.last_run_status === "success" ? "Hoàn thành"
+                       : job.last_run_status === "running" ? "Đang chạy"
+                       : job.last_run_status === "error" ? "Lỗi"
+                       : job.last_run_status}
                     </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Chưa chạy</span>
                   )}
                   <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                    {job.last_run_at ? formatDate(job.last_run_at) : "Chưa chạy"}
+                    {job.last_run_at ? formatDate(job.last_run_at) : ""}
                   </span>
                   <button onClick={() => handleTrigger(job.id)} className="px-3 py-1 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600">
                     Chạy

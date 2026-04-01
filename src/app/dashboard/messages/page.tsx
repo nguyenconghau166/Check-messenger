@@ -5,8 +5,14 @@ import Link from "next/link";
 import type { Conversation } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
+interface ConversationWithLastMsg extends Conversation {
+  last_message_content?: string | null;
+  last_message_sender_type?: string | null;
+  last_message_sender_name?: string | null;
+}
+
 export default function MessagesPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ConversationWithLastMsg[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -23,6 +29,11 @@ export default function MessagesPage() {
     setConversations(data.data || []);
     setTotal(data.total || 0);
     setLoading(false);
+  }
+
+  function truncate(text: string | null | undefined, max: number) {
+    if (!text) return "-";
+    return text.length > max ? text.substring(0, max) + "..." : text;
   }
 
   return (
@@ -52,8 +63,9 @@ export default function MessagesPage() {
                 <tr>
                   <th className="text-left p-3 font-medium">Khách hàng</th>
                   <th className="text-left p-3 font-medium">Kênh</th>
-                  <th className="text-left p-3 font-medium">Tin nhắn</th>
-                  <th className="text-left p-3 font-medium">Tin cuối</th>
+                  <th className="text-left p-3 font-medium">Tin nhắn cuối</th>
+                  <th className="text-left p-3 font-medium w-20">SL</th>
+                  <th className="text-left p-3 font-medium w-36">Thời gian</th>
                 </tr>
               </thead>
               <tbody>
@@ -69,8 +81,22 @@ export default function MessagesPage() {
                         {(conv.channel as unknown as { name: string; channel_type: string })?.channel_type === "facebook" ? "FB" : "ZL"} · {(conv.channel as unknown as { name: string })?.name}
                       </span>
                     </td>
-                    <td className="p-3">{conv.message_count}</td>
-                    <td className="p-3 text-[hsl(var(--muted-foreground))]">
+                    <td className="p-3">
+                      <div className="max-w-md">
+                        {conv.last_message_content ? (
+                          <span className="text-[hsl(var(--muted-foreground))] text-xs">
+                            <span className={`font-medium ${conv.last_message_sender_type === "agent" ? "text-blue-600" : "text-gray-700"}`}>
+                              {conv.last_message_sender_type === "agent" ? "NV" : "KH"}:
+                            </span>
+                            {" "}{truncate(conv.last_message_content, 80)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-center">{conv.message_count}</td>
+                    <td className="p-3 text-[hsl(var(--muted-foreground))] text-xs">
                       {conv.last_message_at ? formatDate(conv.last_message_at) : "-"}
                     </td>
                   </tr>
