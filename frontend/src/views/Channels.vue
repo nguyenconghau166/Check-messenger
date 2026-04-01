@@ -48,24 +48,24 @@
 
           <v-divider class="mb-3" />
           <div class="d-flex ga-2 flex-wrap" @click.stop>
-            <v-menu location="bottom">
-              <template #activator="{ props: menuProps }">
-                <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-sync" :loading="syncing === ch.id" v-bind="menuProps">
-                  {{ $t('sync_now') }}
-                </v-btn>
-              </template>
-              <v-list density="compact">
-                <v-list-item prepend-icon="mdi-sync" @click="syncNow(ch.id)">
-                  <v-list-item-title>{{ $t('sync_recent') }}</v-list-item-title>
-                </v-list-item>
-                <v-list-item prepend-icon="mdi-calendar" @click="openSyncFromDate(ch.id)">
-                  <v-list-item-title>{{ $t('sync_from_date') }}</v-list-item-title>
-                </v-list-item>
-                <v-list-item prepend-icon="mdi-history" @click="syncFull(ch.id)">
-                  <v-list-item-title>{{ $t('sync_full') }}</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
+            <v-btn-group density="compact" divided>
+              <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-sync" :loading="syncing === ch.id" @click="syncNow(ch.id)">
+                {{ $t('sync_now') }}
+              </v-btn>
+              <v-menu location="bottom end">
+                <template #activator="{ props: menuProps }">
+                  <v-btn size="small" variant="tonal" color="primary" icon="mdi-chevron-down" v-bind="menuProps" />
+                </template>
+                <v-list density="compact">
+                  <v-list-item prepend-icon="mdi-calendar" @click="openSyncFromDate(ch.id)">
+                    <v-list-item-title>{{ $t('sync_from_date') }}</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item prepend-icon="mdi-history" @click="syncFull(ch.id)">
+                    <v-list-item-title>{{ $t('sync_full') }}</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </v-btn-group>
             <v-btn v-if="ch.last_sync_status === 'error'" size="small" variant="tonal" color="warning" prepend-icon="mdi-link-variant" :loading="reauthing === ch.id" @click="reauthChannel(ch.id)">
               Kết nối lại
             </v-btn>

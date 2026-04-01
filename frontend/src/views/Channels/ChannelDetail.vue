@@ -7,24 +7,24 @@
       <v-spacer />
       <template v-if="authStore.canEdit('channels')">
         <v-btn variant="outlined" prepend-icon="mdi-pencil" size="small" @click="editDialog = true">{{ $t('edit') }}</v-btn>
-        <v-menu location="bottom">
-          <template #activator="{ props: menuProps }">
-            <v-btn color="primary" prepend-icon="mdi-sync" size="small" :loading="syncing" v-bind="menuProps">
-              {{ $t('sync_now') || 'Dong bo ngay' }}
-            </v-btn>
-          </template>
-          <v-list density="compact">
-            <v-list-item prepend-icon="mdi-sync" @click="doSync()">
-              <v-list-item-title>{{ $t('sync_recent') }}</v-list-item-title>
-            </v-list-item>
-            <v-list-item prepend-icon="mdi-calendar" @click="openSyncFromDate()">
-              <v-list-item-title>{{ $t('sync_from_date') }}</v-list-item-title>
-            </v-list-item>
-            <v-list-item prepend-icon="mdi-history" @click="doSyncFull()">
-              <v-list-item-title>{{ $t('sync_full') }}</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
+        <v-btn-group density="compact" divided>
+          <v-btn color="primary" prepend-icon="mdi-sync" size="small" :loading="syncing" @click="doSync()">
+            {{ $t('sync_now') || 'Dong bo ngay' }}
+          </v-btn>
+          <v-menu location="bottom end">
+            <template #activator="{ props: menuProps }">
+              <v-btn color="primary" size="small" icon="mdi-chevron-down" v-bind="menuProps" />
+            </template>
+            <v-list density="compact">
+              <v-list-item prepend-icon="mdi-calendar" @click="openSyncFromDate()">
+                <v-list-item-title>{{ $t('sync_from_date') }}</v-list-item-title>
+              </v-list-item>
+              <v-list-item prepend-icon="mdi-history" @click="doSyncFull()">
+                <v-list-item-title>{{ $t('sync_full') }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </v-btn-group>
         <v-btn variant="outlined" prepend-icon="mdi-connection" size="small" :loading="testing" @click="doTest">
           Kiểm tra kết nối
         </v-btn>
