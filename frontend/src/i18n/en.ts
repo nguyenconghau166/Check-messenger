@@ -42,6 +42,7 @@ export default {
   nav_mcp: 'MCP Connections',
   nav_messages: 'Messages',
   nav_settings: 'Settings',
+  nav_quotation: 'Quotation',
 
   // Tenants
   tenants: 'Companies',

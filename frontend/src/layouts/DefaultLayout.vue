@@ -411,6 +411,7 @@ const navItems = computed(() => {
     { icon: 'mdi-api', label: 'nav_mcp', route: `${base}/mcp`, exact: false, perm: 'settings' },
     { icon: 'mdi-account-group', label: 'nav_users', route: `${base}/users`, exact: false, perm: 'settings' },
     { icon: 'mdi-cog', label: 'nav_settings', route: `${base}/settings`, exact: false, perm: 'settings' },
+    { icon: 'mdi-file-document-edit', label: 'nav_quotation', route: `${base}/quotation`, exact: false, perm: null },
   ]
   return all.filter(item => !item.perm || authStore.canView(item.perm))
 })

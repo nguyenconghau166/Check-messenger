@@ -117,6 +117,11 @@ const router = createRouter({
           component: () => import('../views/Settings.vue'),
           meta: { perm: 'settings' },
         },
+        {
+          path: 'quotation',
+          name: 'quotation',
+          component: () => import('../views/Quotation.vue'),
+        },
       ],
     },
     // Catch-all 404

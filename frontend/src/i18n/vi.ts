@@ -42,6 +42,7 @@ export default {
   nav_mcp: 'Kết nối MCP',
   nav_messages: 'Tin nhắn',
   nav_settings: 'Cài đặt',
+  nav_quotation: 'Báo giá',
 
   // Tenants
   tenants: 'Công ty',
